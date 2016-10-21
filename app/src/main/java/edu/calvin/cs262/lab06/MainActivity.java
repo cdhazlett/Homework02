@@ -28,82 +28,70 @@ import java.util.HashMap;
 import java.util.List;
 
 /**
- * Reads openweathermap's RESTful API for weather forecasts.
- * The code is based on Deitel's WeatherViewer (Chapter 17), simplified based on Murach's NewsReader (Chapter 10).
- * <p>
- * for CS 262, lab 6
+ * Reads Monopoly player data from a REST api
  *
- * @author kvlinden, Christiaan Hazlett
+ * for CS 262, homework 02
+ *
+ * @author Christiaan Hazlett
  * @version Fall, 2016
  */
 
-// Answers to Lab 6 Questions
-//    1. If the city is invalid, then the app just ignores the request and does not give any warning.
-//    It also does not update any of the weather data on screen.
-//    2. The OpenWeather API key (a long string of text) lets the API know who it is talking to.  This key was probably issued
-//    to the school for this class.  So, when the app requests from the API, OpenWeather is able
-//    to know who is doing the requesting.
-//    3. The JSON response replies with an object that contains the city and a few other data values.
-//    It also includes a list of day objects, and each of those contains a list of temperatures.
-//    For this lab, we are interested in the values "min" and "max" for each of the days in the JSON.
-//    URL: http://api.openweathermap.org/data/2.5/forecast/daily?q=Grand+Rapids%2C+MI&units=imperial&cnt=7&APPID=8301442678d36413b4e3a04d016deee7
-//    4. The system parses the data value by value, and puts everything into a hashmap.  The hashmap
-//    is then used to populate the text fields on the weather interface object
-//    5. The weather class contains variables to hold the data for each of the days, and it includes
-//    a few unit conversion methods, as well as a getter for each data value.
 public class MainActivity extends AppCompatActivity {
 
-    private EditText cityText;
+    private EditText playerText;
     private Button fetchButton;
 
-    private List<Weather> weatherList = new ArrayList<>();
     private ListView itemsListView;
 
-    /* This formater can be used as follows to format temperatures for display.
-     *     numberFormat.format(SOME_DOUBLE_VALUE)
-     */
-    private NumberFormat numberFormat = NumberFormat.getInstance();
-
-    private static String TAG = "MainActivity";
+    private List<Player> playerList = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        cityText = (EditText) findViewById(R.id.cityText);
+        playerText= (EditText) findViewById(R.id.playerText);
         fetchButton = (Button) findViewById(R.id.fetchButton);
-        itemsListView = (ListView) findViewById(R.id.weatherListView);
+        itemsListView = (ListView) findViewById(R.id.playerListView);
 
-        // See comments on this formatter above.
-        //numberFormat.setMaximumFractionDigits(0);
 
         fetchButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                dismissKeyboard(cityText);
-                new GetWeatherTask().execute(createURL(cityText.getText().toString()));
+                dismissKeyboard(playerText);
+
+                new GetPlayerTask().execute(createURL());
             }
         });
+        Log.d("Debug", "Test1");
     }
 
+
     /**
-     * Formats a URL for the webservice specified in the string resources.
+     * Formats a URL for downloading either a single player's data, or all players' data
      *
-     * @param city the target city
-     * @return URL formatted for openweathermap.com
+     * @return URL formatted for Monopoly player server
      */
-    private URL createURL(String city) {
-        try {
-            String urlString = getString(R.string.web_service_url) +
-                    URLEncoder.encode(city, "UTF-8") +
-                    "&units=" + getString(R.string.openweather_units) +
-                    "&cnt=" + getString(R.string.openweather_count) +
-                    "&APPID=" + getString(R.string.openweather_api_key);
-            Log.d("URL", urlString);
-            return new URL(urlString);
-        } catch (Exception e) {
-            Toast.makeText(this, getString(R.string.connection_error), Toast.LENGTH_SHORT).show();
+    private URL createURL() {
+
+        // Create the URL to load the data from the API
+        if (playerText.length() < 1) {
+            try {
+                return new URL("http://cs262.cs.calvin.edu:8089/monopoly/players");
+            }
+            catch (Exception e){
+                Toast.makeText(this, getString(R.string.connection_error), Toast.LENGTH_SHORT).show();
+                Log.d("Debug", "Loc 1");
+            }
+        }
+        else {
+            try {
+                return new URL("http://cs262.cs.calvin.edu:8089/monopoly/player/" + playerText.getText());
+            }
+            catch (Exception e){
+                Toast.makeText(this, getString(R.string.connection_error), Toast.LENGTH_SHORT).show();
+                Log.d("Debug", "Loc 2");
+            }
         }
 
         return null;
@@ -121,9 +109,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Inner class for GETing the current weather data from openweathermap.org asynchronously
+     * Inner class for GETing the player data from the API
      */
-    private class GetWeatherTask extends AsyncTask<URL, Void, JSONObject> {
+    private class GetPlayerTask extends AsyncTask<URL, Void, JSONObject> {
 
         @Override
         protected JSONObject doInBackground(URL... params) {
@@ -151,10 +139,9 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
-        protected void onPostExecute(JSONObject weather) {
-            if (weather != null) {
-                //Log.d(TAG, weather.toString());
-                convertJSONtoArrayList(weather);
+        protected void onPostExecute(JSONObject player_data) {
+            if (player_data != null) {
+                convertJSONtoArrayList(player_data);
                 MainActivity.this.updateDisplay();
             } else {
                 Toast.makeText(MainActivity.this, getString(R.string.connection_error), Toast.LENGTH_SHORT).show();
@@ -163,22 +150,39 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Converts the JSON weather forecast data to an arraylist suitable for a listview adapter
+     * Convert the JSON player data to an ArrayList
      *
-     * @param forecast
+     * @param player_data
      */
-    private void convertJSONtoArrayList(JSONObject forecast) {
-        weatherList.clear(); // clear old weather data
+    private void convertJSONtoArrayList(JSONObject player_data) {
+
+        playerList.clear(); // clear old weather data
         try {
-            JSONArray list = forecast.getJSONArray("list");
-            for (int i = 0; i < list.length(); i++) {
-                JSONObject day = list.getJSONObject(i);
-                JSONObject temperatures = day.getJSONObject("temp");
-                JSONObject weather = day.getJSONArray("weather").getJSONObject(0);
-                String highlow_text = "High: " + String.format("%.0f", day.getJSONObject("temp").getDouble("max")) + "   Low: " + String.format("%.0f", day.getJSONObject("temp").getDouble("min"));
-                weatherList.add(new Weather(
-                        day.getLong("dt"),
-                        weather.getString("description"), highlow_text));
+            if (!player_data.has("plist")) {
+
+                int player_id = player_data.getInt("id");
+                String player_name = "";
+                if (player_data.has("name")) player_name = player_data.getString("name");
+                String player_email = player_data.getString("emailaddress");
+
+                String playerLineText = player_id + ", " + player_name + ", " + player_email;
+
+                playerList.add(new Player(playerLineText));
+
+            }
+            else {
+                JSONArray list = player_data.getJSONArray("plist");
+                for (int i = 0; i < list.length(); i++) {
+                    JSONObject player = list.getJSONObject(i);
+
+                    int player_id = player.getInt("id");
+                    String player_name = player.getString("name");
+                    String player_email = player.getString("emailaddress");
+
+                    String playerLineText = player_id + ", " + player_name + ", " + player_email;
+
+                    playerList.add(new Player(playerLineText));
+                }
             }
         } catch (JSONException e) {
             e.printStackTrace();
@@ -186,24 +190,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Refresh the weather data on the forecast ListView through a simple adapter
+     * Refresh the player data on the forecast ListView through a simple adapter
      */
     private void updateDisplay() {
-        if (weatherList == null) {
+        if (playerList== null) {
             Toast.makeText(MainActivity.this, getString(R.string.connection_error), Toast.LENGTH_SHORT).show();
         }
         ArrayList<HashMap<String, String>> data = new ArrayList<HashMap<String, String>>();
-        for (Weather item : weatherList) {
+        for (Player item : playerList) {
             HashMap<String, String> map = new HashMap<String, String>();
-            map.put("day", item.getDay());
-            map.put("description", item.getSummary());
-            map.put("highlow", item.getHighLow());
+            map.put("playerText", item.getPlayerText());
             data.add(map);
         }
 
-        int resource = R.layout.weather_item;
-        String[] from = {"day", "description", "highlow"};
-        int[] to = {R.id.dayTextView, R.id.summaryTextView, R.id.highlowTextView};
+        int resource = R.layout.player_item;
+        String[] from = {"playerText"};
+        int[] to = {R.id.playerItemText};
 
         SimpleAdapter adapter = new SimpleAdapter(this, data, resource, from, to);
         itemsListView.setAdapter(adapter);

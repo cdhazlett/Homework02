@@ -17,12 +17,12 @@
         android:orientation="horizontal">
 
         <EditText
-            android:id="@+id/cityText"
+            android:id="@+id/playerText"
             style="@style/normalText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/city_value" />
+            />
 
         <Button
             android:id="@+id/fetchButton"
@@ -42,7 +42,7 @@
         android:scrollIndicators="right">
 
             <ListView
-                android:id="@+id/weatherListView"
+                android:id="@+id/playerListView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="top"
